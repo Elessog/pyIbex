@@ -1,6 +1,7 @@
 sudo: false
 
 language: 
+  -python
   - c++
 
 python:
@@ -24,7 +25,7 @@ compiler:
   - gcc-4.8
 os:
   - linux
-  - osx
+  # - osx
 cache:
   directories:
   - $HOME/ibex
@@ -35,7 +36,6 @@ before_install:
   - if [ $TRAVIS_OS_NAME == osx ]; then brew update && brew install python3; fi
 
 before_script:
-  - source ~/virtualenv/python3.4/bin/activate
   - bash ./travis_script/build_Ibex4pyIbex.sh
   - export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/ibex
   - pip install vibes
