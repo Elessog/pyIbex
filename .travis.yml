@@ -22,8 +22,6 @@ addons:
 
 compiler:
   - gcc-4.8
-  - clang
-
 os:
   - linux
   - osx
@@ -34,7 +32,7 @@ cache:
   - $HOME/Downloads
 
 before_install:
-  - if [ $TRAVIS_OS_NAME == osx ]; then brew update && brew install python3.4; fi
+  - if [ $TRAVIS_OS_NAME == osx ]; then brew update && brew install python3; fi
 
 before_script:
   - bash ./travis_script/build_Ibex4pyIbex.sh
@@ -42,7 +40,7 @@ before_script:
   - pip install vibes
 # command to run tests
 script:  
-  - git submodule update
+  - source ~/virtualenv/python3.4/bin/activate
   - mkdir build
   - cd build
   - version=$(python -V 2>&1 | grep -Po '(?<=Python )(.+)')
