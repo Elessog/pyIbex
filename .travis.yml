@@ -35,12 +35,13 @@ before_install:
   - if [ $TRAVIS_OS_NAME == osx ]; then brew update && brew install python3; fi
 
 before_script:
+  - source ~/virtualenv/python3.4/bin/activate
   - bash ./travis_script/build_Ibex4pyIbex.sh
   - export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/ibex
   - pip install vibes
 # command to run tests
 script:  
-  - source ~/virtualenv/python3.4/bin/activate
+
   - mkdir build
   - cd build
   - version=$(python -V 2>&1 | grep -Po '(?<=Python )(.+)')
