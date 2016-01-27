@@ -1,7 +1,6 @@
 sudo: false
 
 language: 
-  - python
   - c++
 
 python:
@@ -19,6 +18,7 @@ addons:
     - cmake
     - time
     - pkg-config
+    - g++-4.8
 
 compiler:
   - gcc-4.8
@@ -48,7 +48,7 @@ script:
   - version=$(python -V 2>&1 | grep -Po '(?<=Python )(.+)')
   - ls ${HOME}/ibex
   - ls ${HOME}/ibex/lib
-  - cmake -DCMAKE_INSTALL_PREFIX=${HOME} -DIBEX_ROOT=${HOME}/ibex -DPYTHON_VERSION=${version:0:3} ../
+  - cmake -DCMAKE_INSTALL_PREFIX=${HOME} -DIBEX_ROOT=${HOME}/ibex -DPYTHON_VERSION=${version:0:3} -DCMAKE_CXX_COMPILER=g++-4.8 ../
   - make && make install
   - export PYTHONPATH=$PYTHONPATH:/home/travis/lib/python${version:0:3}/site-packages
   - python -c "from pyIbex import *"
