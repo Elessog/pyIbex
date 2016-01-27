@@ -45,6 +45,7 @@ script:
   - mkdir build
   - cd build
   - version=$(python -V 2>&1 | grep -Po '(?<=Python )(.+)')
+  - echo ${version:0:3}
   - ls ${HOME}/ibex
   - ls ${HOME}/ibex/lib
   - cmake -DCMAKE_INSTALL_PREFIX=${HOME} -DIBEX_ROOT=${HOME}/ibex -DPYTHON_VERSION=${version:0:3} -DCMAKE_CXX_COMPILER=g++-4.8 ../
