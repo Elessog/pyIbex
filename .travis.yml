@@ -23,11 +23,11 @@ cache:
 
 matrix:
   include:
-    os: osx
-    compiler: clang
-    before_install:
-      - brew update && brew install python3
-      - echo $(python -V)
+    - os: osx
+      compiler: clang
+      before_install:
+       - brew update && brew install python3
+       - echo $(python3 -V)
 # compiler:
 #   - gcc-4.8
 # os:
