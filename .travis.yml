@@ -1,12 +1,6 @@
+language: c++
 sudo: false
 
-language: 
-  - python
-  - c++
-
-python:
-  - "3.4"
-  - "3.5"
 
 addons:
   apt:
@@ -21,35 +15,43 @@ addons:
     - pkg-config
     - g++-4.8
 
-compiler:
-  - gcc-4.8
-os:
-  - linux
-  # - osx
 cache:
   directories:
   - $HOME/ibex
   #- $HOME/boost_1_58_0
   - $HOME/Downloads
 
-before_install:
-  - if [ $TRAVIS_OS_NAME == osx ]; then brew update && brew install python3; fi
+matrix:
+  include:
+    os: osx
+    compiler: clang
+    before_install:
+      - brew update && brew install python3
+      - echo $(python -V)
+# compiler:
+#   - gcc-4.8
+# os:
+#   #- linux
+#   - osx
 
-before_script:
-  - bash ./travis_script/build_Ibex4pyIbex.sh
-  - export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/ibex
-  - pip install vibes
-# command to run tests
-script:  
+# before_install:
+#   - if [ $TRAVIS_OS_NAME == osx ]; then brew update && brew install python3; fi
 
-  - mkdir build
-  - cd build
-  - version=$(python -V 2>&1 | grep -Po '(?<=Python )(.+)')
-  - echo ${version:0:3}
-  - ls ${HOME}/ibex
-  - ls ${HOME}/ibex/lib
-  - cmake -DCMAKE_INSTALL_PREFIX=${HOME} -DIBEX_ROOT=${HOME}/ibex -DPYTHON_VERSION=${version:0:3} -DCMAKE_CXX_COMPILER=g++-4.8 ../
-  - make && make install
-  - export PYTHONPATH=$PYTHONPATH:/home/travis/lib/python${version:0:3}/site-packages
-  - python -c "from pyIbex import *"
-  - make test
+# before_script:
+#   - bash ./travis_script/build_Ibex4pyIbex.sh
+#   - export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/ibex
+#   - pip install vibes
+# # command to run tests
+# script:  
+
+#   - mkdir build
+#   - cd build
+#   - version=$(python -V 2>&1 | grep -Po '(?<=Python )(.+)')
+#   - echo ${version:0:3}
+#   - ls ${HOME}/ibex
+#   - ls ${HOME}/ibex/lib
+#   - cmake -DCMAKE_INSTALL_PREFIX=${HOME} -DIBEX_ROOT=${HOME}/ibex -DPYTHON_VERSION=${version:0:3} -DCMAKE_CXX_COMPILER=g++-4.8 ../
+#   - make && make install
+#   - export PYTHONPATH=$PYTHONPATH:/home/travis/lib/python${version:0:3}/site-packages
+#   - python -c "from pyIbex import *"
+#   - make test
