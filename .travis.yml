@@ -21,10 +21,12 @@ cache:
   #- $HOME/boost_1_58_0
   - $HOME/Downloads
 
-matrix:
-  include:
-    - os: osx
-      compiler: clang
+# matrix:
+  # include:
+
+os: osx
+compiler: clang
+
 before_install:
   - if [ $TRAVIS_OS_NAME == osx ]; then brew update && brew install python3; fi
   - echo $(python3 -V)
