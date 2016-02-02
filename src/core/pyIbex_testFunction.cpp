@@ -1,4 +1,4 @@
-#include "ibex/ibex.h"
+#include "ibex_IntervalVector.h"
 
 #include <boost/python.hpp>
 #include <boost/shared_ptr.hpp>
@@ -18,10 +18,6 @@ namespace py = boost::python;
 enum IBOOL { IN = 0 , OUT = 1 ,MAYBE =2 , UNK = 3 , EMPTY = 4 , UNK2 = 5 };
 
 
-class testing
-{
-public:
-testing(){};
 
 int testDist(const IntervalVector X, const IntervalVector m, const double rang2, const bool efficient ) {
     Interval reach = Interval(0,rang2);
@@ -52,17 +48,34 @@ int testDist(const IntervalVector X, const IntervalVector m, const double rang2,
     return IBOOL::UNK;
 }
 
+bool find(std::vector<int> res,int val){
+       for ( auto it = res.cbegin(); it != res.cend(); ++it ){
+            if (*it==val)
+              return true;
+       }
+       return false;
+    }
+
 int testR(const IntervalVector& X,const py::list& lst,double rang2,bool efficient){
     boost::python::ssize_t n = boost::python::len(lst);
-    std::vector<IntervalVector> m=to_std_vector<IntervalVector>(lst);
+    std::vector<IntervalVector> m;
+    for (int i=0;i<n;i++){
+        IntervalVector vect = IntervalVector(2);
+        vect[0] = to_std_vector<Interval>(lst[i])[0];
+        vect[1] = to_std_vector<Interval>(lst[i])[1];
+        /*std::cout << "m : [" << vect[0].lb() << " , " << vect[0].ub() << " ]"  << " , [" << vect[1].lb() << " , " << vect[1].ub() << " ]"<< std::endl;*/
+        m.push_back(vect);
+    }
+    //=to_std_vector<IntervalVector>(lst);
     std::vector<int> res;
     for ( auto it = m.cbegin(); it != m.cend(); ++it )
       res.push_back(testDist(X,*it,rang2,efficient));
-    if (find(res.cbegin(), res.cend(),IBOOL::IN)!=res.cend())
+    //std::cout << res[0] << std::endl;
+    if (find(res,IBOOL::IN))
       return IBOOL::IN;
-    if (find(res.cbegin(), res.cend(),IBOOL::UNK)!=res.cend())
+    if (find(res,IBOOL::UNK))
       return IBOOL::UNK;
-    if (find(res.cbegin(), res.cend(),IBOOL::MAYBE)!=res.cend())
+    if (find(res,IBOOL::MAYBE))
       return IBOOL::MAYBE;
     bool test = true;
     for ( auto it = res.cbegin(); it != res.cend(); ++it )
@@ -72,11 +85,9 @@ int testR(const IntervalVector& X,const py::list& lst,double rang2,bool efficien
     return IBOOL::UNK;
 }
 
-};
 
 
 void export_testFunction(){
-  class_<testing,boost::noncopyable,boost::shared_ptr<testing>  >("testRa",no_init)
-        .def("testR",&testing::testR);
+        def("testR",&testR);
 }
 
