@@ -160,7 +160,7 @@ struct Vector_from_python_list
         using namespace boost::python;
         // Extract the character data from the python string
         //      const char* value = PyString_AsString(obj_ptr);
-        list l(handle<>(borrowed(obj_ptr)));
+        boost::python::list l(handle<>(borrowed(obj_ptr)));
 
         // // Verify that obj_ptr is a string (should be ensured by convertible())
         // assert(value);

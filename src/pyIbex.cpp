@@ -34,7 +34,7 @@ void export_Set();
 void export_BoolInterval();
 
 int export_PixelMap();
-
+void export_testFunction();
 void export_wip();
 
 
@@ -96,7 +96,7 @@ BOOST_PYTHON_MODULE(pyIbex)
     export_Predicate();
     export_Set();
     export_PixelMap();
-
+    export_testFunction();
     export_wip();
     
 }
