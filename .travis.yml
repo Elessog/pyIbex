@@ -60,3 +60,4 @@ script:
   - export PYTHONPATH=$PYTHONPATH:/home/travis/lib/python${version}/site-packages
   - python -c "from pyIbex import *"
   - make test
+  - python3 ./tests/test_SepPolygon.py
