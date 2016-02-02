@@ -51,12 +51,12 @@ install:
 script:  
   - mkdir build
   - cd build
-  - version=$(python3 -V 2>&1 | grep -Po '(?<=Python )(.+)')
-  - echo ${version:0:3}
+  - export version=$(python3 -c "import sys; print(sys.version[:3])")
+  - echo $version
   - ls ${HOME}/ibex
   - ls ${HOME}/ibex/lib
-  - cmake -DCMAKE_INSTALL_PREFIX=${HOME} -DIBEX_ROOT=${HOME}/ibex -DPYTHON_VERSION=${version:0:3} ../
+  - cmake -DCMAKE_INSTALL_PREFIX=${HOME} -DIBEX_ROOT=${HOME}/ibex -DPYTHON_VERSION=${version} ../
   - make && make install
-  - export PYTHONPATH=$PYTHONPATH:/home/travis/lib/python${version:0:3}/site-packages
+  - export PYTHONPATH=$PYTHONPATH:/home/travis/lib/python${version}/site-packages
   - python -c "from pyIbex import *"
   - make test
