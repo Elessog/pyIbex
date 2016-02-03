@@ -55,7 +55,18 @@ struct std_pair_to_python_converter
 };
 
 
-
+template <class T>
+struct std_vector_to_list
+{
+	static PyObject* convert(std::vector<T> vector) {
+		typename std::vector<T>::iterator iter;
+		py::list list;
+		for (iter = vector.begin(); iter != vector.end(); ++iter) {
+			list.append(*iter);
+		}
+		return py::incref(list.ptr());
+	}
+};
 
 struct Vector_to_list
 {
