@@ -4,6 +4,9 @@
 Ibex python binding
 ==========================
 
+!!!!Warning : The cmakelist of this repository has been changed
+if you encounter problems with it check the one in the original repo. 
+
 --------------------------
 Introduction
 --------------------------
