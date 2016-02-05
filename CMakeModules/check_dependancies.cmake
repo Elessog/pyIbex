@@ -70,5 +70,7 @@ if(IBEX_FOUND)
   INCLUDE_DIRECTORIES(${IBEX_INCLUDE_DIRS})
   SET(LIBS ${LIBS} ${IBEX_LIBRARIES} )
 else()
-  MESSAGE(FATAL_ERROR "Unable to find IbexLib. Need to set IBEX_ROOT ${IBEX_ROOT}")
+  MESSAGE(ERROR "Unable to find IbexLib. Need to set IBEX_ROOT ${IBEX_ROOT}")
+  MESSAGE(FATAL_ERROR "To install ibex run : \n\t sh travis_script/install_ibexlib.sh /path/to/your/install/dir")
+  
 endif()
