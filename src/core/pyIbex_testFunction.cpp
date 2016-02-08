@@ -179,15 +179,88 @@ std::vector<IntervalVector> rSIVIA(const IntervalVector& X,const py::list& lst,d
     return AllIn;
 }
 
-/*std::vector<IntervalVector> rSIVIA(const IntervalVector& X0,std::vector<IntervalVector> m,double rang2,bool efficient){
-    std::vector<IntervalVector> X;
-    X	
+py::list aSIVIA(const IntervalVector& X,const py::list& lst,double rang2,double eps=0.1,bool efficient=true){
+   std::vector<IntervalVector> in;
+   std::vector<IntervalVector> out;
+   std::vector<IntervalVector> maybe;
+   std::vector<IntervalVector> border;
+   boost::python::ssize_t n = boost::python::len(lst);
+   std::vector<IntervalVector> m;
+   #if defined VIBES_COMP_
+   vibes::beginDrawing ();
+   vibes::newFigure("lab2");
+   #endif
+   int i;
+   for (i=0;i<n;i++){
+       IntervalVector vect = IntervalVector(2);
+       vect[0] = to_std_vector<Interval>(lst[i])[0];
+       vect[1] = to_std_vector<Interval>(lst[i])[1];
+       m.push_back(vect);
+   }
+   std::stack<IntervalVector> s;
+   //printIntVect(X);
+   s.push(X);
+   while (!s.empty()) 
+   {
+       IntervalVector box=s.top();
+       s.pop();
+       //printIntVect(box);
+       int res=testRC(box,m,rang2,efficient);
 
-}*/
+       if (res==IBOOL::IN)
+       {
+          #if defined VIBES_COMP_
+          vibes::drawBox(box[0].lb(), box[0].ub(), box[1].lb(), box[1].ub(), "k[r]");
+          #endif
+          in.push_back(box);
+       }
+       else if (res==IBOOL::OUT)
+       {
+          #if defined VIBES_COMP_
+          vibes::drawBox(box[0].lb(), box[0].ub(), box[1].lb(), box[1].ub(), "k[o]");
+          #endif
+          out.push_back(box);
+       }
+       else if (res==IBOOL::MAYBE)
+       {
+          #if defined VIBES_COMP_
+          vibes::drawBox(box[0].lb(), box[0].ub(), box[1].lb(), box[1].ub(), "k[b]");
+          #endif
+          maybe.push_back(box);
+       }
+       else if (box.max_diam()>eps)
+       {
+       // get the index of the dimension of maximal size (false stands for "max")
+           i = box.extr_diam_index(false);
+           std::pair<IntervalVector,IntervalVector> p=box.bisect(i);
+           s.push(p.first);
+           s.push(p.second);
+       }
+       else
+       {
+           #if defined VIBES_COMP_
+           vibes::drawBox(box[0].lb(), box[0].ub(), box[1].lb(), box[1].ub(), "k[y]");
+           #endif
+           border.push_back(box);
+       }
+   }
+
+   #if defined VIBES_COMP_
+   vibes::endDrawing();
+   #endif
+   py::list list;
+   list.append(in);
+   list.append(out);
+   list.append(maybe);
+   list.append(border);
+   py::incref(list.ptr());
+   return list;
+}
 
 void export_testFunction(){
         python::to_python_converter<std::vector<IntervalVector>, std_vector_to_list<IntervalVector> >();
         def("testR",&testR);
         def("SIVIAtest",&rSIVIA);
+        def("fSIVIAtest",&aSIVIA);
 }
 
