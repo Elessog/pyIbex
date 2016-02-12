@@ -12,6 +12,10 @@
 #if defined VIBES_COMP_ 
 #include "vibes/vibes.h"
 #endif
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/core/core.hpp>
+#include "opencv2/videoio/videoio.hpp"
 
 using namespace boost;
 using namespace boost::python;
@@ -263,7 +267,7 @@ void toPixels(const float echellePixel,int resp[2],const int x,const int y,const
    //get the value in the matrix imgIntegral at the position x, y in the interval world
    resp[0] = round(x/echellePixel) + i0;
    resp[1] = -round(y/echellePixel) + j0;
-} 
+}
     //Method for calculate the sum and the size of the box in the integral image:
 void computeBox(const float &echellePixel,int resp[2],const IntervalVector& X,const std::vector<std::vector<int>> &l_imgIntegral,const int &i0,const int &j0){
      //Calcul of the points A,B,C and D:
@@ -281,7 +285,7 @@ void computeBox(const float &echellePixel,int resp[2],const IntervalVector& X,co
 }
 
 //Method which create the pavage with SIVIA:
-int testIm(const float echellePixel,const IntervalVector& X,const std::vector<std::vector<int>> &image,const int i0,const int j0){
+int testIm(const float echellePixel,const IntervalVector& X,const std::vector<std::vector<int>>& image,const int i0,const int j0){
         int resp[2];
         computeBox(echellePixel,resp,X,image,i0,j0);
 
@@ -301,7 +305,7 @@ py::list imSIVIA(const IntervalVector& X,const py::list& lst,double rang2,const 
    std::vector<IntervalVector> border;
    boost::python::ssize_t n = boost::python::len(lst);
    boost::python::ssize_t width = boost::python::len(image[0]);
-   boost::python::ssize_t heigth = boost::python::len(image);
+   boost::python::ssize_t height = boost::python::len(image);
    std::vector<IntervalVector> m;
    std::vector<std::vector<int>> imageC;
    int i;
@@ -312,7 +316,7 @@ py::list imSIVIA(const IntervalVector& X,const py::list& lst,double rang2,const 
        vect[1] = to_std_vector<Interval>(lst[i])[1];
        m.push_back(vect);
    }
-   for (j=0;j<heigth;j++){
+   for (j=0;j<height;j++){
        std::vector<int> line;
        for (i=0;i<width;i++){
         line.push_back(py::extract<int>(image[j][i]));
@@ -389,27 +393,152 @@ py::list imSIVIA(const IntervalVector& X,const py::list& lst,double rang2,const 
 class clSIVIA
 {
   public:
-      clSIVIA(const py::list& image) {
+      clSIVIA(const py::list& image,int kernelSize = 3 ,int iterationK = 3) {
        boost::python::ssize_t width = boost::python::len(image[0]);
-       boost::python::ssize_t heigth = boost::python::len(image);
+       boost::python::ssize_t height = boost::python::len(image);
        int i;
        int j;
-       for (j=0;j<heigth;j++)
-       {
-         std::vector<int> line;
-         for (i=0;i<width;i++){
-          line.push_back(py::extract<int>(image[j][i]));
-         }
-         imageC.push_back(line);       
-       } 
-      };
-      
+       //kernelTrail = cv::Mat(kernelSize,kernelSize);
+       is_recording = false;
+       iteration = iterationK;
+       width_ = width;
+       height_ = height;
+       imageCBin = cv::Mat(height_,width_,CV_8UC1);
+       imageC = cv::Mat(height_+1,width_+1,CV_32SC1);
+       maskColor = cv::Mat(height_,width_,CV_8UC3);
+       maskColor.setTo(cv::Scalar(51,153,255));
+       for (j=0;j<height_;j++){
+          for (i=0;i<width_;i++)
+		imageCBin.at<uint8_t>(j,i)=py::extract<int>(image[j][i]);
+       }
+       cv::integral(imageCBin,imageC,CV_32SC1);
+       imageC = imageC(cv::Rect(1,1,width_,height_));
+       std::cout << "First Image saved.." << std::endl;
+       past = cv::Mat(height_,width_,CV_8UC1);
+       imageColor = cv::Mat(height_,width_,CV_8UC3);
+       pastInt = cv::Mat(height_,width_,CV_32SC1);
+       past.setTo(cv::Scalar(0,0,0));
+       pastInt.setTo(cv::Scalar(0,0,0));
+       std::cout << "clSIVIA initialised !" << std::endl;
+      }
       py::list imSIVIA(const IntervalVector& X,const py::list& lst,double rang2,const float echellePixel,
                  const int i0,const int j0,double eps,bool efficient);
+      void setRecord(std::string const & msg,float fps);
+      ~clSIVIA(){
+       
+      }
   private:
-     std::vector<std::vector<int>> imageC;
+     cv::Mat imageCBin;
+     cv::Mat imageC;
+     cv::Mat past;
+     cv::Mat pastInt;
+     cv::Mat imageColor;
+     cv::VideoWriter record;
+     cv::Mat maskColor;
+     bool is_recording;
+     int iteration;
+     int width_;
+     int height_;
+     int testIm(const float echellePixel,const IntervalVector& X,const int i0,const int j0);
+     void computeBox(const float &echellePixel,int resp[2],const IntervalVector& X,const int &i0,const int &j0);
+     int testIm3(const float echellePixel,const IntervalVector& X,const int i0,const int j0);
+     void computeBox2(const float &echellePixel,int resp[2],const IntervalVector& X,const int &i0,const int &j0);
+     void drawBox(const IntervalVector& X,const float echellePixel,const int i0,const int j0);
+     void drawReal(const IntervalVector& X,const float echellePixel,const int i0,const int j0,cv::Scalar color);
 };
 
+void clSIVIA::setRecord(std::string const & msg,float fps){
+  /*std::stringstream path_ss;
+   path_ss	<< "video_"<<num<<".avi";
+   std::string msg = path_ss.str();*/
+   record = cv::VideoWriter(msg,CV_FOURCC('D','I','V','X'), fps,cv::Size(width_,height_), true);
+   is_recording = true;
+}
+
+void clSIVIA::computeBox(const float &echellePixel,int resp[2],const IntervalVector& X,const int &i0,const int &j0){
+     //Calcul of the points A,B,C and D:
+     int A[2];
+     toPixels(echellePixel,A,X[0].lb(),X[1].ub(),i0,j0);
+     int C[2];
+     toPixels(echellePixel,C,X[0].ub(),X[1].lb(),i0,j0);
+     //Calcul of the sum:
+     resp[0] = imageC.at<int>(A[1],A[0]) + imageC.at<int>(C[1],C[0]) - imageC.at<int>(A[1],C[0]) - imageC.at<int>(C[1],A[0]); //Sum=A + C - B - D  
+     //Calcul of the size of the box:
+     resp[1] = (C[0] - A[0]) * (C[1] - A[1]);
+}
+
+//Method which create the pavage with SIVIA:
+int clSIVIA::testIm(const float echellePixel,const IntervalVector& X,const int i0,const int j0){
+        int resp[2];
+        clSIVIA::computeBox(echellePixel,resp,X,i0,j0);
+
+        if (resp[0] == 0)
+            return IBOOL::OUT;
+        if (resp[0] == resp[1])
+            return IBOOL::IN;
+        else
+            return IBOOL::UNK;
+}
+
+void clSIVIA::computeBox2(const float &echellePixel,int resp[2],const IntervalVector& X,const int &i0,const int &j0){
+     //Calcul of the points A,B,C and D:
+     int A[2];
+     toPixels(echellePixel,A,X[0].lb(),X[1].ub(),i0,j0);
+     int C[2];
+     toPixels(echellePixel,C,X[0].ub(),X[1].lb(),i0,j0);
+     //Calcul of the sum:
+     int sign[4] = {1,1,-1,-1};
+     resp[0] = sign[0]*pastInt.at<int>(A[1],A[0]) + sign[1]*pastInt.at<int>(C[1],C[0]) + sign[2]*pastInt.at<int>(A[1],C[0]) + sign[3]*pastInt.at<int>(C[1],A[0]); //Sum=A + C - B - D  
+
+     //Calcul of the size of the box:
+     resp[1] = (C[0] - A[0]) * (C[1] - A[1]);
+     if (resp[0]<0)
+        std::cout<<"error A:"<< A[0] <<" "<<A[1] <<"  C :" << C[0] <<" " <<C[1] <<" "<<resp[1] <<std::endl;
+}
+
+//Method which create the pavage with SIVIA:
+int clSIVIA::testIm3(const float echellePixel,const IntervalVector& X,const int i0,const int j0){
+        int resp[2];
+        clSIVIA::computeBox2(echellePixel,resp,X,i0,j0);
+
+        if (resp[0] == 0)
+            return IBOOL::OUT;
+        if (resp[0] == resp[1]){
+               return IBOOL::IN;
+        }
+        else
+            return IBOOL::UNK;
+}
+
+void clSIVIA::drawBox(const IntervalVector& X,const float echellePixel,const int i0,const int j0){
+     int A[2];
+     toPixels(echellePixel,A,X[0].lb(),X[1].ub(),i0,j0);
+     int C[2];
+     toPixels(echellePixel,C,X[0].ub(),X[1].lb(),i0,j0);
+     std::vector<cv::Point> fillContSingle;
+     fillContSingle.push_back(cv::Point(A[0],A[1]));
+     fillContSingle.push_back(cv::Point(C[0],A[1]));
+     fillContSingle.push_back(cv::Point(C[0],C[1]));
+     fillContSingle.push_back(cv::Point(A[0],C[1]));
+     std::vector<std::vector<cv::Point> > fillContAll;
+     fillContAll.push_back(fillContSingle);
+     cv::fillPoly( past, fillContAll, cv::Scalar(1,1,1));
+}
+
+void clSIVIA::drawReal(const IntervalVector& X,const float echellePixel,const int i0,const int j0,cv::Scalar color){
+     int A[2];
+     toPixels(echellePixel,A,X[0].lb(),X[1].ub(),i0,j0);
+     int C[2];
+     toPixels(echellePixel,C,X[0].ub(),X[1].lb(),i0,j0);
+     std::vector<cv::Point> fillContSingle;
+     fillContSingle.push_back(cv::Point(A[0],A[1]));
+     fillContSingle.push_back(cv::Point(C[0],A[1]));
+     fillContSingle.push_back(cv::Point(C[0],C[1]));
+     fillContSingle.push_back(cv::Point(A[0],C[1]));
+     std::vector<std::vector<cv::Point> > fillContAll;
+     fillContAll.push_back(fillContSingle);
+     cv::fillPoly( imageColor, fillContAll, color);
+}
 
 py::list clSIVIA::imSIVIA(const IntervalVector& X,const py::list& lst,double rang2,const float echellePixel,
                  const int i0,const int j0,double eps=0.1,bool efficient=true){
@@ -431,30 +560,33 @@ py::list clSIVIA::imSIVIA(const IntervalVector& X,const py::list& lst,double ran
    vibes::newFigure("lab2");
    #endif
    std::stack<IntervalVector> s;
-   //printIntVect(X);
    s.push(X);
    std::cout << "Initialisation Finished" << std::endl; 
    while (!s.empty()) 
    {
        IntervalVector box=s.top();
        s.pop();
-       //printIntVect(box);
-       int res=testIm(echellePixel,box,imageC,i0,j0);
+
+       int res=clSIVIA::testIm(echellePixel,box,i0,j0);
+       int res3=clSIVIA::testIm3(echellePixel,box,i0,j0);
        int res2=testRC(box,m,rang2,efficient);
-       //std::cout << res << "   " << res2 << std::endl;
-       if (res==IBOOL::IN || res2 ==IBOOL::IN)
+
+       if (res==IBOOL::IN || res2 ==IBOOL::IN || res3 == IBOOL::IN )
        {
           #if defined VIBES_COMP_
           vibes::drawBox(box[0].lb(), box[0].ub(), box[1].lb(), box[1].ub(), "k[r]");
           #endif
           in.push_back(box);
+          clSIVIA::drawBox(box,echellePixel,i0,j0);
+          clSIVIA::drawReal(box,echellePixel,i0,j0,cv::Scalar(0,204,0));
        }
-       else if ((res == IBOOL::OUT && res2 == IBOOL::OUT ) || (res2 == IBOOL::OUT &&  res != IBOOL::UNK))
+       else if (res == IBOOL::OUT && res2 == IBOOL::OUT && res3 == IBOOL::OUT)
        {
           #if defined VIBES_COMP_
           vibes::drawBox(box[0].lb(), box[0].ub(), box[1].lb(), box[1].ub(), "k[o]");
           #endif
           out.push_back(box);
+          clSIVIA::drawReal(box,echellePixel,i0,j0,cv::Scalar(255,128,0));
        }
        else if (res2==IBOOL::MAYBE)
        {
@@ -479,10 +611,19 @@ py::list clSIVIA::imSIVIA(const IntervalVector& X,const py::list& lst,double ran
            border.push_back(box);
        }
    }
-
    #if defined VIBES_COMP_
    vibes::endDrawing();
    #endif
+   pastInt.setTo(cv::Scalar(0,0,0));
+   cv::erode(past,past,cv::Mat(),cv::Point(-1,-1), iteration);
+   cv::integral(past,pastInt,CV_32SC1);
+   pastInt = pastInt(cv::Rect(1,1,width_,height_));
+   //reset imgBin
+   past.setTo(cv::Scalar(0,0,0));
+   maskColor.copyTo(imageColor,imageCBin);
+   if (is_recording)
+     record << imageColor;
+   imageColor.setTo(cv::Scalar(0,0,0));
    py::list list;
    list.append(in);
    list.append(out);
@@ -499,7 +640,8 @@ void export_testFunction(){
         def("fSIVIAtest",&aSIVIA);
         def("imSIVIAtest",&imSIVIA);
         class_<clSIVIA>("clSIVIA", init<const py::list&>())
-           .def("greet", &clSIVIA::imSIVIA)  // Add a regular member function.
+           .def("imSIVIA", &clSIVIA::imSIVIA)  // Add a regular member function.
+           .def("setRecord", &clSIVIA::setRecord)
         ;
 }
 

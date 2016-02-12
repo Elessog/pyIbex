@@ -11,7 +11,12 @@ IF(NOT CMAKE_BUILD_TYPE)
 	#SET(CMAKE_BUILD_TYPE "RELWITHDEBINFO")
 	#SET(CMAKE_BUILD_TYPE "MINSIZEREL")
 ENDIF()
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fpermissive")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+
+IF (False)
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+ENDIF()
+
 # option declaration
 option(BUILD_TESTS "Build tests" ON)
 option(BUILD_EXAMPLE "Build example" OFF)

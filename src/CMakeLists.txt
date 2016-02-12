@@ -8,9 +8,11 @@ INCLUDE_DIRECTORIES("core")
 
 file(GLOB CORE_SRCS "core/pyIbex_*.cpp")
 
+find_package( OpenCV REQUIRED )
+
 add_subdirectory(wip)
 PYTHON_ADD_MODULE(pyIbex pyIbex.cpp ${CORE_SRCS} wip/pyIbex_wip.cpp )
-target_link_libraries(pyIbex ${LIBS} wip)
+target_link_libraries(pyIbex ${LIBS} opencv_core opencv_imgproc opencv_highgui  opencv_videoio opencv_imgcodecs wip)
 
 
 install( TARGETS pyIbex DESTINATION "${PYTHON_INSTDIR}/pyIbex")
