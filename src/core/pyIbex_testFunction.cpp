@@ -393,14 +393,22 @@ py::list imSIVIA(const IntervalVector& X,const py::list& lst,double rang2,const 
 class clSIVIA
 {
   public:
-      clSIVIA(const py::list& image,int kernelSize = 3 ,int iterationK = 3) {
+      clSIVIA(const py::list& image,int kernelSize = 3 ,int erosion_elem = 0) {
        boost::python::ssize_t width = boost::python::len(image[0]);
        boost::python::ssize_t height = boost::python::len(image);
        int i;
        int j;
-       //kernelTrail = cv::Mat(kernelSize,kernelSize);
+       int erosion_type;
+       if( erosion_elem == 0 ){ erosion_type = cv::MORPH_RECT; }
+       else if( erosion_elem == 1 ){ erosion_type = cv::MORPH_CROSS; }
+       else if( erosion_elem == 2) { erosion_type = cv::MORPH_ELLIPSE; }
+
+       kernelTrail = cv::getStructuringElement( erosion_type,
+                                       cv::Size( 2*kernelSize + 1, 2*kernelSize+1 ),
+                                       cv::Point(kernelSize, kernelSize) );
        is_recording = false;
-       iteration = iterationK;
+       is_rect = false;
+       do_erode = true;
        width_ = width;
        height_ = height;
        imageCBin = cv::Mat(height_,width_,CV_8UC1);
@@ -423,7 +431,8 @@ class clSIVIA
       }
       py::list imSIVIA(const IntervalVector& X,const py::list& lst,double rang2,const float echellePixel,
                  const int i0,const int j0,double eps,bool efficient);
-      void setRecord(std::string const & msg,float fps);
+      void setRecord(std::string const & msg,float fps,bool rectangle);
+      void setErode(bool do_erod);
       ~clSIVIA(){
        
       }
@@ -435,7 +444,10 @@ class clSIVIA
      cv::Mat imageColor;
      cv::VideoWriter record;
      cv::Mat maskColor;
+     cv::Mat kernelTrail;
      bool is_recording;
+     bool is_rect;
+     bool do_erode;
      int iteration;
      int width_;
      int height_;
@@ -447,12 +459,17 @@ class clSIVIA
      void drawReal(const IntervalVector& X,const float echellePixel,const int i0,const int j0,cv::Scalar color);
 };
 
-void clSIVIA::setRecord(std::string const & msg,float fps){
+void clSIVIA::setRecord(std::string const & msg,float fps,bool rectangle = false){
   /*std::stringstream path_ss;
    path_ss	<< "video_"<<num<<".avi";
    std::string msg = path_ss.str();*/
    record = cv::VideoWriter(msg,CV_FOURCC('D','I','V','X'), fps,cv::Size(width_,height_), true);
+   is_rect = rectangle;
    is_recording = true;
+}
+
+void clSIVIA::setErode(bool do_erod){
+    do_erode = do_erod;
 }
 
 void clSIVIA::computeBox(const float &echellePixel,int resp[2],const IntervalVector& X,const int &i0,const int &j0){
@@ -538,6 +555,8 @@ void clSIVIA::drawReal(const IntervalVector& X,const float echellePixel,const in
      std::vector<std::vector<cv::Point> > fillContAll;
      fillContAll.push_back(fillContSingle);
      cv::fillPoly( imageColor, fillContAll, color);
+     if (is_rect)
+       cv::rectangle(imageColor,cv::Point(A[0],A[1]),cv::Point(C[0],C[1]), cv::Scalar(0,0,0));
 }
 
 py::list clSIVIA::imSIVIA(const IntervalVector& X,const py::list& lst,double rang2,const float echellePixel,
@@ -586,7 +605,8 @@ py::list clSIVIA::imSIVIA(const IntervalVector& X,const py::list& lst,double ran
           vibes::drawBox(box[0].lb(), box[0].ub(), box[1].lb(), box[1].ub(), "k[o]");
           #endif
           out.push_back(box);
-          clSIVIA::drawReal(box,echellePixel,i0,j0,cv::Scalar(255,128,0));
+          if (is_recording)
+             clSIVIA::drawReal(box,echellePixel,i0,j0,cv::Scalar(255,128,0));
        }
        else if (res2==IBOOL::MAYBE)
        {
@@ -615,15 +635,21 @@ py::list clSIVIA::imSIVIA(const IntervalVector& X,const py::list& lst,double ran
    vibes::endDrawing();
    #endif
    pastInt.setTo(cv::Scalar(0,0,0));
-   cv::erode(past,past,cv::Mat(),cv::Point(-1,-1), iteration);
+   if (do_erode)
+     cv::erode(past,past,kernelTrail);
    cv::integral(past,pastInt,CV_32SC1);
    pastInt = pastInt(cv::Rect(1,1,width_,height_));
    //reset imgBin
    past.setTo(cv::Scalar(0,0,0));
-   maskColor.copyTo(imageColor,imageCBin);
-   if (is_recording)
+   
+   if (is_recording){
+     maskColor.copyTo(imageColor,imageCBin);
      record << imageColor;
-   imageColor.setTo(cv::Scalar(0,0,0));
+     cv::imshow("Boxes",imageColor);
+     cv::waitKey(5);
+     imageColor.setTo(cv::Scalar(0,0,0));
+   }
+   
    py::list list;
    list.append(in);
    list.append(out);
@@ -639,9 +665,10 @@ void export_testFunction(){
         def("SIVIAtest",&rSIVIA);
         def("fSIVIAtest",&aSIVIA);
         def("imSIVIAtest",&imSIVIA);
-        class_<clSIVIA>("clSIVIA", init<const py::list&>())
+        class_<clSIVIA>("clSIVIA", init<const py::list&,int,int>())
            .def("imSIVIA", &clSIVIA::imSIVIA)  // Add a regular member function.
            .def("setRecord", &clSIVIA::setRecord)
+           .def("setErode", &clSIVIA::setErode)
         ;
 }
 
