@@ -393,12 +393,13 @@ py::list imSIVIA(const IntervalVector& X,const py::list& lst,double rang2,const 
 class clSIVIA
 {
   public:
-      clSIVIA(const py::list& image,int kernelSize = 3 ,int erosion_elem = 0) {
+      clSIVIA(const py::list& image,int kernelSize = 3 ,int erosion_elem = 0,int iter = 1) {
        boost::python::ssize_t width = boost::python::len(image[0]);
        boost::python::ssize_t height = boost::python::len(image);
        int i;
        int j;
        int erosion_type;
+       iteration = iter;
        if( erosion_elem == 0 ){ erosion_type = cv::MORPH_RECT; }
        else if( erosion_elem == 1 ){ erosion_type = cv::MORPH_CROSS; }
        else if( erosion_elem == 2) { erosion_type = cv::MORPH_ELLIPSE; }
@@ -636,7 +637,7 @@ py::list clSIVIA::imSIVIA(const IntervalVector& X,const py::list& lst,double ran
    #endif
    pastInt.setTo(cv::Scalar(0,0,0));
    if (do_erode)
-     cv::erode(past,past,kernelTrail);
+     cv::erode(past,past,kernelTrail,cv::Point(-1,-1),iteration);
    cv::integral(past,pastInt,CV_32SC1);
    pastInt = pastInt(cv::Rect(1,1,width_,height_));
    //reset imgBin
@@ -665,7 +666,7 @@ void export_testFunction(){
         def("SIVIAtest",&rSIVIA);
         def("fSIVIAtest",&aSIVIA);
         def("imSIVIAtest",&imSIVIA);
-        class_<clSIVIA>("clSIVIA", init<const py::list&,int,int>())
+        class_<clSIVIA>("clSIVIA", init<const py::list&,int,int,int>())
            .def("imSIVIA", &clSIVIA::imSIVIA)  // Add a regular member function.
            .def("setRecord", &clSIVIA::setRecord)
            .def("setErode", &clSIVIA::setErode)
