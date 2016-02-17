@@ -51,10 +51,10 @@ int testDist(const IntervalVector X, const IntervalVector m, const double rang2,
     Interval B2 = ( reach.ub() - Xp);
     if  (B2.ub() < 0)
     {
-        if (b1 )
-          return IBOOL::MAYBE;
         if (efficient)
            return IBOOL::OUT;
+        if (b1 )
+          return IBOOL::MAYBE;
 	return IBOOL::UNK2;
     }
     return IBOOL::UNK;
