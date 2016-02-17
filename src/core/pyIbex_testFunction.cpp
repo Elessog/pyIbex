@@ -16,6 +16,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/core/core.hpp>
 #include "opencv2/videoio/videoio.hpp"
+#include <pthread.h>
 
 using namespace boost;
 using namespace boost::python;
@@ -75,7 +76,6 @@ int testR(const IntervalVector& X,const py::list& lst,double rang2,bool efficien
         IntervalVector vect = IntervalVector(2);
         vect[0] = to_std_vector<Interval>(lst[i])[0];
         vect[1] = to_std_vector<Interval>(lst[i])[1];
-        /*std::cout << "m : [" << vect[0].lb() << " , " << vect[0].ub() << " ]"  << " , [" << vect[1].lb() << " , " << vect[1].ub() << " ]"<< std::endl;*/
         m.push_back(vect);
     }
     //=to_std_vector<IntervalVector>(lst);
@@ -134,13 +134,11 @@ std::vector<IntervalVector> rSIVIA(const IntervalVector& X,const py::list& lst,d
     }
     std::vector<IntervalVector> AllIn;
     std::stack<IntervalVector> s;
-    //printIntVect(X);
     s.push(X);
     while (!s.empty()) 
     {
 		IntervalVector box=s.top();
 		s.pop();
-                //printIntVect(box);
 		int res=testRC(box,m,rang2,efficient);
 
 		if (res==IBOOL::IN)
@@ -202,13 +200,11 @@ py::list aSIVIA(const IntervalVector& X,const py::list& lst,double rang2,double 
        m.push_back(vect);
    }
    std::stack<IntervalVector> s;
-   //printIntVect(X);
    s.push(X);
    while (!s.empty()) 
    {
        IntervalVector box=s.top();
        s.pop();
-       //printIntVect(box);
        int res=testRC(box,m,rang2,efficient);
 
        if (res==IBOOL::IN)
@@ -279,9 +275,6 @@ void computeBox(const float &echellePixel,int resp[2],const IntervalVector& X,co
      resp[0] = l_imgIntegral[A[1]][A[0]] + l_imgIntegral[C[1]][C[0]] - l_imgIntegral[A[1]][C[0]] - l_imgIntegral[C[1]][A[0]]; //Sum=A + C - B - D  
      //Calcul of the size of the box:
      resp[1] = (C[0] - A[0]) * (C[1] - A[1]);
-     /*if (abs(resp[0])>resp[1]) {
-       std::cout << "Error compute : "<<resp[1] << " " << resp[0] << std::endl;
-     }*/
 }
 
 //Method which create the pavage with SIVIA:
@@ -328,17 +321,13 @@ py::list imSIVIA(const IntervalVector& X,const py::list& lst,double rang2,const 
    vibes::newFigure("lab2");
    #endif
    std::stack<IntervalVector> s;
-   //printIntVect(X);
    s.push(X);
-   std::cout << "Initialisation Finished" << std::endl; 
    while (!s.empty()) 
    {
        IntervalVector box=s.top();
        s.pop();
-       //printIntVect(box);
        int res=testIm(echellePixel,box,imageC,i0,j0);
        int res2=testRC(box,m,rang2,efficient);
-       //std::cout << res << "   " << res2 << std::endl;
        if (res==IBOOL::IN || res2 ==IBOOL::IN)
        {
           #if defined VIBES_COMP_
@@ -410,6 +399,7 @@ class clSIVIA
        is_recording = false;
        is_rect = false;
        do_erode = true;
+       show = false;
        width_ = width;
        height_ = height;
        imageCBin = cv::Mat(height_,width_,CV_8UC1);
@@ -425,24 +415,36 @@ class clSIVIA
        std::cout << "First Image saved.." << std::endl;
        past = cv::Mat(height_,width_,CV_8UC1);
        imageColor = cv::Mat(height_,width_,CV_8UC3);
+       imageColor1 = cv::Mat(height_,width_,CV_8UC3);
+       imageColor2 = cv::Mat(height_,width_,CV_8UC3);
        pastInt = cv::Mat(height_,width_,CV_32SC1);
        past.setTo(cv::Scalar(0,0,0));
        pastInt.setTo(cv::Scalar(0,0,0));
+       imageColor1.setTo(cv::Scalar(0,0,0));
+       imageColor2.setTo(cv::Scalar(0,0,0));
        std::cout << "clSIVIA initialised !" << std::endl;
       }
       py::list imSIVIA(const IntervalVector& X,const py::list& lst,double rang2,const float echellePixel,
                  const int i0,const int j0,double eps,bool efficient);
       void setRecord(std::string const & msg,float fps,bool rectangle);
       void setErode(bool do_erod);
+     void stopScreening();
       ~clSIVIA(){
-       
+        show = false;
+        if (is_recording)
+           pthread_join(thread,NULL);
       }
   private:
+     pthread_mutex_t mutex;
+     pthread_t thread;
+     bool change;
      cv::Mat imageCBin;
      cv::Mat imageC;
      cv::Mat past;
      cv::Mat pastInt;
      cv::Mat imageColor;
+     cv::Mat imageColor1;
+     cv::Mat imageColor2;
      cv::VideoWriter record;
      cv::Mat maskColor;
      cv::Mat kernelTrail;
@@ -452,21 +454,46 @@ class clSIVIA
      int iteration;
      int width_;
      int height_;
+     bool show;
      int testIm(const float echellePixel,const IntervalVector& X,const int i0,const int j0);
      void computeBox(const float &echellePixel,int resp[2],const IntervalVector& X,const int &i0,const int &j0);
      int testIm3(const float echellePixel,const IntervalVector& X,const int i0,const int j0);
      void computeBox2(const float &echellePixel,int resp[2],const IntervalVector& X,const int &i0,const int &j0);
      void drawBox(const IntervalVector& X,const float echellePixel,const int i0,const int j0);
      void drawReal(const IntervalVector& X,const float echellePixel,const int i0,const int j0,cv::Scalar color);
+     void screening();
+     static void *screening_helper(void *context)
+     {
+        ((clSIVIA *)context)->screening();
+        return NULL;
+     }
 };
 
 void clSIVIA::setRecord(std::string const & msg,float fps,bool rectangle = false){
-  /*std::stringstream path_ss;
-   path_ss	<< "video_"<<num<<".avi";
-   std::string msg = path_ss.str();*/
    record = cv::VideoWriter(msg,CV_FOURCC('D','I','V','X'), fps,cv::Size(width_,height_), true);
    is_rect = rectangle;
    is_recording = true;
+   mutex = PTHREAD_MUTEX_INITIALIZER;
+   if (pthread_create(&thread, NULL,&clSIVIA::screening_helper,this) != 0)
+             exit(EXIT_FAILURE);
+}
+
+
+void clSIVIA::screening(){
+     show = true;
+     while(show){
+        pthread_mutex_lock(&mutex);
+        if (change)
+          imageColor1.copyTo(imageColor2);
+        change = false;
+        pthread_mutex_unlock(&mutex);
+        cv::imshow("Boxes",imageColor2);
+        cv::waitKey(20);
+     }
+}
+
+void clSIVIA::stopScreening(){
+     show = false;
 }
 
 void clSIVIA::setErode(bool do_erod){
@@ -645,9 +672,16 @@ py::list clSIVIA::imSIVIA(const IntervalVector& X,const py::list& lst,double ran
    
    if (is_recording){
      maskColor.copyTo(imageColor,imageCBin);
+     for(auto it = m.cbegin(); it!=m.cend();it++){
+        int C[2];
+        toPixels(echellePixel,C,(*it)[0].mid(),(*it)[1].mid(),i0,j0);
+        circle(imageColor,cv::Point(C[0],C[1]), 2, cv::Scalar(0,0,255), -1);
+     }
      record << imageColor;
-     cv::imshow("Boxes",imageColor);
-     cv::waitKey(5);
+     pthread_mutex_lock(&mutex);
+     imageColor.copyTo(imageColor1);
+     change = true;
+     pthread_mutex_unlock(&mutex);
      imageColor.setTo(cv::Scalar(0,0,0));
    }
    
@@ -670,6 +704,7 @@ void export_testFunction(){
            .def("imSIVIA", &clSIVIA::imSIVIA)  // Add a regular member function.
            .def("setRecord", &clSIVIA::setRecord)
            .def("setErode", &clSIVIA::setErode)
+           .def("stopScreening",&clSIVIA::stopScreening)
         ;
 }
 
