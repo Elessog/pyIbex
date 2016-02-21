@@ -40,20 +40,20 @@ int testDist(const IntervalVector X, const IntervalVector m, const double rang2,
 
     Interval Xp = max(sqr(X[0]-m[0].lb()),sqr(X[0]-m[0].ub())) +
                   max(sqr(X[1]-m[1].lb()),sqr(X[1]-m[1].ub()));//f+(||[X]-m||²)
-      
+
     Interval Xub = Xm | Xp;
     if (reach.is_disjoint(Xub))
       return IBOOL::OUT;
     else if (Xub.is_subset(reach))
       return IBOOL::IN;
-      
-    bool b1 = ( Xm - reach.ub()).is_subset(Interval(-1000, 0));
-    Interval B2 = ( reach.ub() - Xp);
-    if  (B2.ub() < 0)
+
+    //bool b1 = ;  //( Xm - reach.ub()).is_subset(Interval(-10000, 0));
+
+    if  (reach.ub() - Xp.lb() < 0)
     {
         if (efficient)
            return IBOOL::OUT;
-        if (b1 )
+        if (Xm.ub()-reach.ub() <= 0)
           return IBOOL::MAYBE;
 	return IBOOL::UNK2;
     }
@@ -428,7 +428,8 @@ class clSIVIA
                  const int i0,const int j0,double eps,bool efficient);
       void setRecord(std::string const & msg,float fps,bool rectangle);
       void setErode(bool do_erod);
-     void stopScreening();
+      void startScreening(bool rectangle);
+      void stopScreening();
       ~clSIVIA(){
         show = false;
         if (is_recording)
@@ -449,6 +450,7 @@ class clSIVIA
      cv::Mat maskColor;
      cv::Mat kernelTrail;
      bool is_recording;
+     bool is_screening;
      bool is_rect;
      bool do_erode;
      int iteration;
@@ -473,11 +475,15 @@ void clSIVIA::setRecord(std::string const & msg,float fps,bool rectangle = false
    record = cv::VideoWriter(msg,CV_FOURCC('D','I','V','X'), fps,cv::Size(width_,height_), true);
    is_rect = rectangle;
    is_recording = true;
-   mutex = PTHREAD_MUTEX_INITIALIZER;
-   if (pthread_create(&thread, NULL,&clSIVIA::screening_helper,this) != 0)
-             exit(EXIT_FAILURE);
 }
 
+void clSIVIA::startScreening(bool rectangle){
+     is_rect = rectangle;
+     is_screening = true;
+     mutex = PTHREAD_MUTEX_INITIALIZER;
+     if (pthread_create(&thread, NULL,&clSIVIA::screening_helper,this) != 0)
+             exit(EXIT_FAILURE);
+}
 
 void clSIVIA::screening(){
      show = true;
@@ -625,7 +631,8 @@ py::list clSIVIA::imSIVIA(const IntervalVector& X,const py::list& lst,double ran
           #endif
           in.push_back(box);
           clSIVIA::drawBox(box,echellePixel,i0,j0);
-          clSIVIA::drawReal(box,echellePixel,i0,j0,cv::Scalar(0,204,0));
+          if (is_recording||is_screening)
+             clSIVIA::drawReal(box,echellePixel,i0,j0,cv::Scalar(0,204,0));
        }
        else if (res == IBOOL::OUT && res2 == IBOOL::OUT && res3 == IBOOL::OUT)
        {
@@ -633,7 +640,7 @@ py::list clSIVIA::imSIVIA(const IntervalVector& X,const py::list& lst,double ran
           vibes::drawBox(box[0].lb(), box[0].ub(), box[1].lb(), box[1].ub(), "k[o]");
           #endif
           out.push_back(box);
-          if (is_recording)
+          if (is_recording||is_screening)
              clSIVIA::drawReal(box,echellePixel,i0,j0,cv::Scalar(255,128,0));
        }
        else if (res2==IBOOL::MAYBE)
@@ -642,6 +649,8 @@ py::list clSIVIA::imSIVIA(const IntervalVector& X,const py::list& lst,double ran
           vibes::drawBox(box[0].lb(), box[0].ub(), box[1].lb(), box[1].ub(), "k[b]");
           #endif
           maybe.push_back(box);
+          if (is_recording||is_screening)
+             clSIVIA::drawReal(box,echellePixel,i0,j0,cv::Scalar(110,28,228));
        }
        else if (box.max_diam()>eps)
        {
@@ -669,19 +678,21 @@ py::list clSIVIA::imSIVIA(const IntervalVector& X,const py::list& lst,double ran
    pastInt = pastInt(cv::Rect(1,1,width_,height_));
    //reset imgBin
    past.setTo(cv::Scalar(0,0,0));
-   
-   if (is_recording){
+   if (is_recording||is_screening){
      maskColor.copyTo(imageColor,imageCBin);
      for(auto it = m.cbegin(); it!=m.cend();it++){
         int C[2];
         toPixels(echellePixel,C,(*it)[0].mid(),(*it)[1].mid(),i0,j0);
         circle(imageColor,cv::Point(C[0],C[1]), 2, cv::Scalar(0,0,255), -1);
      }
-     record << imageColor;
-     pthread_mutex_lock(&mutex);
-     imageColor.copyTo(imageColor1);
-     change = true;
-     pthread_mutex_unlock(&mutex);
+     if (is_recording)
+        record << imageColor;
+     if (is_screening){
+        pthread_mutex_lock(&mutex);
+        imageColor.copyTo(imageColor1);
+        change = true;
+        pthread_mutex_unlock(&mutex);
+     }
      imageColor.setTo(cv::Scalar(0,0,0));
    }
    
@@ -704,6 +715,7 @@ void export_testFunction(){
            .def("imSIVIA", &clSIVIA::imSIVIA)  // Add a regular member function.
            .def("setRecord", &clSIVIA::setRecord)
            .def("setErode", &clSIVIA::setErode)
+           .def("setScreening",&clSIVIA::startScreening)
            .def("stopScreening",&clSIVIA::stopScreening)
         ;
 }
