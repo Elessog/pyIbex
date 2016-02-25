@@ -40,7 +40,7 @@ int testDist(const IntervalVector X, const IntervalVector m, const double rang2,
 
     Interval Xp = max(sqr(X[0]-m[0].lb()),sqr(X[0]-m[0].ub())) +
                   max(sqr(X[1]-m[1].lb()),sqr(X[1]-m[1].ub()));//f+(||[X]-m||²)
-
+      
     Interval Xub = Xm | Xp;
     if (reach.is_disjoint(Xub))
       return IBOOL::OUT;
@@ -426,6 +426,8 @@ class clSIVIA
       }
       py::list imSIVIA(const IntervalVector& X,const py::list& lst,double rang2,const float echellePixel,
                  const int i0,const int j0,double eps,bool efficient);
+      void imSIVIAligth(const IntervalVector& X,const py::list& lst,double rang2,const float echellePixel,
+                 const int i0,const int j0,double eps,bool efficient);
       void setRecord(std::string const & msg,float fps,bool rectangle);
       void setErode(bool do_erod);
       void startScreening(bool rectangle);
@@ -705,6 +707,86 @@ py::list clSIVIA::imSIVIA(const IntervalVector& X,const py::list& lst,double ran
    return list;
 }
 
+void clSIVIA::imSIVIAligth(const IntervalVector& X,const py::list& lst,double rang2,const float echellePixel,
+                 const int i0,const int j0,double eps=0.1,bool efficient=true){
+
+   boost::python::ssize_t n = boost::python::len(lst);
+   std::vector<IntervalVector> m;
+   int i;
+   for (i=0;i<n;i++){
+       IntervalVector vect = IntervalVector(2);
+       vect[0] = to_std_vector<Interval>(lst[i])[0];
+       vect[1] = to_std_vector<Interval>(lst[i])[1];
+       m.push_back(vect);
+   }
+
+   std::stack<IntervalVector> s;
+   s.push(X);
+   std::cout << "Initialisation Finished" << std::endl; 
+   while (!s.empty()) 
+   {
+       IntervalVector box=s.top();
+       s.pop();
+
+       int res=clSIVIA::testIm(echellePixel,box,i0,j0);
+       int res3=clSIVIA::testIm3(echellePixel,box,i0,j0);
+       int res2=testRC(box,m,rang2,efficient);
+
+       if (res==IBOOL::IN || res2 ==IBOOL::IN || res3 == IBOOL::IN )
+       {
+          clSIVIA::drawBox(box,echellePixel,i0,j0);
+          if (is_recording||is_screening)
+             clSIVIA::drawReal(box,echellePixel,i0,j0,cv::Scalar(0,204,0));
+       }
+       else if (res == IBOOL::OUT && res2 == IBOOL::OUT && res3 == IBOOL::OUT)
+       {
+
+          if (is_recording||is_screening)
+             clSIVIA::drawReal(box,echellePixel,i0,j0,cv::Scalar(255,128,0));
+       }
+       else if (res2==IBOOL::MAYBE)
+       {
+
+          if (is_recording||is_screening)
+             clSIVIA::drawReal(box,echellePixel,i0,j0,cv::Scalar(110,28,228));
+       }
+       else if (box.max_diam()>eps)
+       {
+       // get the index of the dimension of maximal size (false stands for "max")
+           i = box.extr_diam_index(false);
+           std::pair<IntervalVector,IntervalVector> p=box.bisect(i);
+           s.push(p.first);
+           s.push(p.second);
+       }
+   }
+
+   pastInt.setTo(cv::Scalar(0,0,0));
+   if (do_erode)
+     cv::erode(past,past,kernelTrail,cv::Point(-1,-1),iteration);
+   cv::integral(past,pastInt,CV_32SC1);
+   pastInt = pastInt(cv::Rect(1,1,width_,height_));
+   //reset imgBin
+   past.setTo(cv::Scalar(0,0,0));
+   if (is_recording||is_screening){
+     maskColor.copyTo(imageColor,imageCBin);
+     for(auto it = m.cbegin(); it!=m.cend();it++){
+        int C[2];
+        toPixels(echellePixel,C,(*it)[0].mid(),(*it)[1].mid(),i0,j0);
+        circle(imageColor,cv::Point(C[0],C[1]), 2, cv::Scalar(0,0,255), -1);
+     }
+     if (is_recording)
+        record << imageColor;
+     if (is_screening){
+        pthread_mutex_lock(&mutex);
+        imageColor.copyTo(imageColor1);
+        change = true;
+        pthread_mutex_unlock(&mutex);
+     }
+     imageColor.setTo(cv::Scalar(0,0,0));
+   }
+}
+
+
 void export_testFunction(){
         python::to_python_converter<std::vector<IntervalVector>, std_vector_to_list<IntervalVector> >();
         def("testR",&testR);
@@ -713,6 +795,7 @@ void export_testFunction(){
         def("imSIVIAtest",&imSIVIA);
         class_<clSIVIA>("clSIVIA", init<const py::list&,int,int,int>())
            .def("imSIVIA", &clSIVIA::imSIVIA)  // Add a regular member function.
+           .def("limSIVIA", &clSIVIA::imSIVIAligth)  // Add a regular member function.
            .def("setRecord", &clSIVIA::setRecord)
            .def("setErode", &clSIVIA::setErode)
            .def("setScreening",&clSIVIA::startScreening)
